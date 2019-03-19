@@ -2239,7 +2239,7 @@ static void send_commit1(MigrationState *s)
     s->time_buf_off += sprintf(s->time_buf+s->time_buf_off, "\t%.4lf", (s->transfer_real_finish_time-s->transfer_real_start_time) * 1000);
     s->time_buf_off += sprintf(s->time_buf+s->time_buf_off, "\ttrntm\t%.4lf", (s->transfer_finish_time-s->transfer_start_time)*1000);
     s->time_buf_off += sprintf(s->time_buf+s->time_buf_off, "\t%4d\n", s->dirty_pfns_len);
-    //printf(s->time_buf);
+    //printf("%s",s->time_buf);
     s->time_buf_off = 0;
 
     FTPRINTF("\n%s %d (%lf) send commmit1\n", __func__, migrate_get_index(s), time_in_double());
@@ -2880,7 +2880,12 @@ static void *migration_thread(void *opaque)
 
     trace_migration_thread_setup_complete();
 
-	printf("Start live migration iterate backup\n");
+	if(enable_cuju) {
+		printf("Start system memory backup\n");
+		migration_completion(s, current_active_state,
+               &old_vm_running, &start_time);
+	}
+
     while (s->state == MIGRATION_STATUS_ACTIVE ||
            s->state == MIGRATION_STATUS_POSTCOPY_ACTIVE) {
         int64_t current_time;
@@ -3367,16 +3372,11 @@ static void migrate_timer(void *opaque)
     if (kvm_blk_session)
         kvm_blk_epoch_timer(kvm_blk_session);
 
-#ifdef ENABLE_DIRTY_PAGE_TRACKING
-    dirty_page_tracking_backup(s->cur_off);
-#endif
-
     s->flush_vs_commit1 = false;
     s->transfer_start_time = time_in_double();
     s->ram_len = 0;
     kvm_shmem_send_dirty_kernel(s);
 
-    dirty_page_tracking_logs_commit(s);
     dirty_page_tracking_logs_start_transfer(s);
 
     assert(!kvmft_write_protect_dirty_pages(s->cur_off));
